@@ -12,3 +12,4 @@ async def root():
         "status": "running",
         "message": "ML Inference Server is online"
     }
+    
