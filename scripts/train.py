@@ -12,3 +12,17 @@ print(df.head())
 X = df["text"]
 y = df["label"]
 
+model = Pipeline(
+    [
+        ("tfidf", TfidfVectorizer()),
+        ("classifier", MultinomialNB())
+    ]
+)
+
+model.fit(X, y)
+
+joblib.dump(model, "models/spam_model.joblib")
+
+print("Training complete!")
+print("Model saved successfully!")
+
