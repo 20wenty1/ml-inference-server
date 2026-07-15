@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from worker.inference import predict
+
 app = FastAPI(
     title="ML Inference Server",
     description="A ML inference server built with FastAPI",
@@ -8,23 +10,23 @@ app = FastAPI(
 
 
 class PredictionRequest(BaseModel):
-    age: int
-    salary: float
+    text: str
 
 
 @app.get("/")
 async def root():
     return {
-        "status": "running",
-        "message": "ML Inference Server is online"
+        "status": "Running",
+        "message": "ML Inference Server is online",
     }
 
 
 @app.post("/predict")
-async def predict(data: PredictionRequest):
+async def predict_endpoint(data: PredictionRequest):
+    prediction = predict(data.text)
+
     return {
-        "received": data,
-        "prediction": "test_prediction"
+        "prediction": prediction
     }
     
     
