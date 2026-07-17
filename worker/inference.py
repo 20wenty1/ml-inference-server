@@ -1,7 +1,9 @@
-from worker.loader import model
-
+import torch
+from worker.loader import model, vectorizer
 
 def predict(text: str):
-    prediction = model.predict([text])
-
-    return prediction[0]
+    vec = vectorizer.transform([text]).toarray()
+    x = torch.tensor(vec, dtype=torch.float32)
+    with torch.no_grad():
+        out = model(x)
+    return "spam" if out.item() > 0.5 else "ham"
