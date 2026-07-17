@@ -12,7 +12,7 @@ class SpamNet(nn.Module):
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
-        return torch.sigmoid(self.fc2(x))
+        return self.fc2(x)
 
 input_dim = len(vectorizer.get_feature_names_out())
 model = SpamNet(input_dim)

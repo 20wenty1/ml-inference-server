@@ -28,11 +28,13 @@ class SpamNet(nn.Module):
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
-        return torch.sigmoid(self.fc2(x))
+        return self.fc2(x)
 
 model = SpamNet(X_train_t.shape[1])
 opt = torch.optim.Adam(model.parameters(), lr=0.001)
-loss_fn = nn.BCELoss()
+
+spam_weight = (y_train == 0).sum() / (y_train == 1).sum()
+loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([spam_weight]))
 
 for epoch in range(20):
     model.train()
@@ -45,10 +47,11 @@ for epoch in range(20):
 
 model.eval()
 with torch.no_grad():
-    preds = (model(X_test_t) > 0.5).float()
+    preds = (torch.sigmoid(model(X_test_t)) > 0.5).float()
     acc = (preds == y_test_t).float().mean()
     print("test acc:", acc.item())
 
 torch.save(model.state_dict(), "models/spam_model.pt")
 joblib.dump(vec, "models/vectorizer.joblib")
 print("done training")
+
