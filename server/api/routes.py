@@ -1,3 +1,4 @@
+import time
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from worker.inference import predict
@@ -20,25 +21,23 @@ def root():
 @router.post("/predict")
 def predict_text(request: PredictionRequest):
     try:
-        logger.info("Prediction request received")
-
+        logger.info(f"Prediction request received: {request.text}")
+        start = time.perf_counter()
         prediction = predict(request.text)
+        elapsed = (time.perf_counter() - start) * 1000
 
-        logger.info(f"Prediction: {prediction}")
+        logger.info(f"Prediction: {prediction} | Inference Time: {elapsed:.2f} ms")
 
         return {
             "success": True,
             "prediction": prediction
         }
 
-    except Exception as e:
-        logger.error(f"Prediction failed: {e}")
-
+    except Exception:
+        logger.exception("Prediction failed")
         raise HTTPException(
             status_code=500,
             detail="Prediction failed"
         )
     
 
-    
-    
