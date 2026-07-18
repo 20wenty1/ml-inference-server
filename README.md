@@ -1,6 +1,6 @@
 # ML Inference Server
 
-Currently building the Python/FastAPI prototype before implementing the final C HTTP server and persistent PyTorch worker.
+Python/FastAPI prototype complete. C HTTP server now connects to a persistent PyTorch worker over a Unix domain socket for live predictions.
 
 ## Goal
 
