@@ -5,12 +5,19 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-
+#include <sys/time.h>
 #define WORKER_SOCK "/tmp/spam_worker.sock"
+#define WORKER_TIMEOUT_SEC 3
 
 int call_worker(char *text, char *out, int out_size) {
     int sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock < 0) return -1;
+
+    struct timeval tv;
+    tv.tv_sec = WORKER_TIMEOUT_SEC;
+    tv.tv_usec = 0;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
@@ -21,13 +28,18 @@ int call_worker(char *text, char *out, int out_size) {
         return -1;
     }
 
-    write(sock, text, strlen(text));
+    if (write(sock, text, strlen(text)) < 0) {
+        close(sock);
+        return -1;
+    }
 
     int n = read(sock, out, out_size - 1);
-    if (n > 0)
+    if (n > 0) {
         out[n] = '\0';
-    else
-        out[0] = '\0';
+    } else {
+        close(sock);
+        return -1;
+    }
 
     close(sock);
     return 0;
@@ -61,18 +73,25 @@ void handle_client(int client_fd) {
         snprintf(res, sizeof(res), "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
     }
     else if (strcmp(method, "POST") == 0 && strcmp(path, "/predict") == 0) {
-        char prediction[256];
-        int ok = (body != NULL) && call_worker(body, prediction, sizeof(prediction)) == 0;
+        if (body == NULL || strlen(body) == 0) {
+            char *msg = "{\"error\": \"empty request body\"}";
+            len = strlen(msg);
+            snprintf(res, sizeof(res), "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+        }
+        else {
+            char prediction[256];
+            int ok = call_worker(body, prediction, sizeof(prediction)) == 0;
 
-        if (ok) {
-            char msg[300];
-            snprintf(msg, sizeof(msg), "{\"prediction\": \"%s\"}", prediction);
-            len = strlen(msg);
-            snprintf(res, sizeof(res), "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
-        } else {
-            char *msg = "{\"error\": \"worker unavailable\"}";
-            len = strlen(msg);
-            snprintf(res, sizeof(res), "HTTP/1.1 502 Bad Gateway\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+            if (ok) {
+                char msg[300];
+                snprintf(msg, sizeof(msg), "{\"prediction\": \"%s\"}", prediction);
+                len = strlen(msg);
+                snprintf(res, sizeof(res), "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+            } else {
+                char *msg = "{\"error\": \"worker unavailable or timed out\"}";
+                len = strlen(msg);
+                snprintf(res, sizeof(res), "HTTP/1.1 502 Bad Gateway\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+            }
         }
     }
     else {
