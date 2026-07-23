@@ -6,22 +6,21 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/time.h>
-#define WORKER_SOCK "/tmp/spam_worker.sock"
-#define WORKER_TIMEOUT_SEC 3
+#include "config.h"
 
 int call_worker(char *text, char *out, int out_size) {
     int sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock < 0) return -1;
 
     struct timeval tv;
-    tv.tv_sec = WORKER_TIMEOUT_SEC;
+    tv.tv_sec = WORKER_TIMEOUT_SECONDS;
     tv.tv_usec = 0;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, WORKER_SOCK, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, WORKER_SOCKET_PATH, sizeof(addr.sun_path) - 1);
 
     if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         close(sock);
@@ -46,7 +45,7 @@ int call_worker(char *text, char *out, int out_size) {
 }
 
 void handle_client(int client_fd) {
-    char buffer[4096];
+    char buffer[REQUEST_BUFFER_SIZE];
     int n = read(client_fd, buffer, sizeof(buffer) - 1);
     if (n <= 0) {
         close(client_fd);
@@ -64,7 +63,7 @@ void handle_client(int client_fd) {
     printf("method: %s\n", method);
     printf("path: %s\n", path);
 
-    char res[512];
+    char res[RESPONSE_BUFFER_SIZE];
     int len;
 
     if (strcmp(method, "GET") == 0 && strcmp(path, "/") == 0) {
@@ -117,7 +116,7 @@ int main() {
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(8080);
+    addr.sin_port = htons(SERVER_PORT);
 
     if (bind(server_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("bind failed");
@@ -129,7 +128,7 @@ int main() {
         exit(1);
     }
 
-    printf("listening on port 8080\n");
+    printf("listening on port %d\n", SERVER_PORT);
 
     while (1) {
         struct sockaddr_in client_addr;
