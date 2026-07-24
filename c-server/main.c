@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/time.h>
+#include <pthread.h>
 #include "config.h"
 
 int call_worker(char *text, char *out, int out_size) {
@@ -103,6 +104,13 @@ void handle_client(int client_fd) {
     close(client_fd);
 }
 
+void *handle_client_thread(void *arg) {
+    int client_fd = *(int *)arg;
+    free(arg);
+    handle_client(client_fd);
+    return NULL;
+}
+
 int main() {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
@@ -138,7 +146,18 @@ int main() {
             perror("accept failed");
             continue;
         }
-        handle_client(client_fd);
+
+        int *fd_ptr = malloc(sizeof(int));
+        *fd_ptr = client_fd;
+
+        pthread_t tid;
+        if (pthread_create(&tid, NULL, handle_client_thread, fd_ptr) != 0) {
+            perror("thread create failed");
+            free(fd_ptr);
+            close(client_fd);
+            continue;
+        }
+        pthread_detach(tid);
     }
 
     close(server_fd);
