@@ -1,8 +1,12 @@
 import socket
 import os
+import sys
 from worker.inference import predict
 
-SOCKET_PATH = "/tmp/spam_worker.sock"
+if len(sys.argv) > 1:
+    SOCKET_PATH = sys.argv[1]
+else:
+    SOCKET_PATH = "/tmp/spam_worker.sock"
 
 if os.path.exists(SOCKET_PATH):
     os.remove(SOCKET_PATH)
