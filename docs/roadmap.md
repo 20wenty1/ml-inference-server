@@ -25,7 +25,7 @@
 
 ## Phase 4 - Production Features
 
-- [ ] Day 15 - Worker Pool & Concurrent Request Handling (C server is multithreaded; Python worker is still a single process — worker pool is next)
+- [ ] Day 15 - Worker Pool & Concurrent Request Handling (C server is multithreaded; Python worker is still a single process — next: run multiple worker processes and have the C server pick between them per request)
 - [x] Day 16 - Logging, Configuration & Error Handling
 - [ ] Day 17 - Testing, Benchmarking & Performance Optimization (unit + integration tests done; benchmarking not started)
 - [ ] Day 18 - Docker, Documentation & Final Polish
