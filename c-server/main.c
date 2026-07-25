@@ -9,7 +9,7 @@
 #include <pthread.h>
 #include "config.h"
 
-int call_worker(char *text, char *out, int out_size) {
+int call_worker(const char *socket_path, char *text, char *out, int out_size) {
     int sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock < 0) return -1;
 
@@ -21,7 +21,7 @@ int call_worker(char *text, char *out, int out_size) {
 
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, WORKER_SOCKET_PATH, sizeof(addr.sun_path) - 1);
+    strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
     if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         close(sock);
@@ -43,6 +43,17 @@ int call_worker(char *text, char *out, int out_size) {
 
     close(sock);
     return 0;
+}
+
+pthread_mutex_t worker_index_lock = PTHREAD_MUTEX_INITIALIZER;
+int next_worker_index = 0;
+
+const char *pick_worker_socket() {
+    pthread_mutex_lock(&worker_index_lock);
+    int index = next_worker_index;
+    next_worker_index = (next_worker_index + 1) % NUM_WORKERS;
+    pthread_mutex_unlock(&worker_index_lock);
+    return WORKER_SOCKET_PATHS[index];
 }
 
 void handle_client(int client_fd) {
@@ -80,7 +91,8 @@ void handle_client(int client_fd) {
         }
         else {
             char prediction[256];
-            int ok = call_worker(body, prediction, sizeof(prediction)) == 0;
+            const char *socket_path = pick_worker_socket();
+            int ok = call_worker(socket_path, body, prediction, sizeof(prediction)) == 0;
 
             if (ok) {
                 char msg[300];
