@@ -27,6 +27,7 @@ Build an HTTP server from scratch that:
 - Benchmarking against the FastAPI baseline
 - Docker packaging
 - CI/CD
+- Health check endpoint for monitoring server/worker status 
 
 ## Tech Stack
 
