@@ -58,19 +58,40 @@ const char *pick_worker_socket() {
 
 void handle_client(int client_fd) {
     char buffer[REQUEST_BUFFER_SIZE];
-    int n = read(client_fd, buffer, sizeof(buffer) - 1);
-    if (n <= 0) {
+    int total_read = 0;
+    int header_end = -1;
+    int content_length = 0;
+
+    while (total_read < (int)sizeof(buffer) - 1) {
+        int n = read(client_fd, buffer + total_read, sizeof(buffer) - 1 - total_read);
+        if (n <= 0) break;
+        total_read += n;
+        buffer[total_read] = '\0';
+
+        char *marker = strstr(buffer, "\r\n\r\n");
+        if (marker != NULL) {
+            header_end = (marker - buffer) + 4;
+
+            char *cl = strstr(buffer, "Content-Length:");
+            if (cl != NULL) {
+                content_length = atoi(cl + 15);
+            }
+
+            int body_received = total_read - header_end;
+            if (body_received >= content_length) break;
+        }
+    }
+
+    if (total_read <= 0) {
         close(client_fd);
         return;
     }
-    buffer[n] = '\0';
 
     char method[8];
     char path[256];
     sscanf(buffer, "%7s %255s", method, path);
 
-    char *body = strstr(buffer, "\r\n\r\n");
-    if (body != NULL) body += 4;
+    char *body = (header_end >= 0) ? buffer + header_end : NULL;
 
     printf("method: %s\n", method);
     printf("path: %s\n", path);

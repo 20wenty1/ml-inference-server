@@ -26,8 +26,10 @@ def send_request(i):
         with urllib.request.urlopen(req, timeout=5) as res:
             res.read()
             ok = True
-    except Exception:
+    except Exception as e:
+        print(f"FAILED: {e}")
         ok = False
+        
     elapsed = time.perf_counter() - start
 
     return ok, elapsed
