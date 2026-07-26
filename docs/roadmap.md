@@ -4,8 +4,8 @@
 
 - [x] Day 1 - Project Setup & How the Internet Works
 - [x] Day 2 - What Happens When You Type `google.com`
-- [ ] Day 3 - DNS, IP Addresses & Routing
-- [ ] Day 4 - TCP & The Three-Way Handshake
+- [x] Day 3 - DNS, IP Addresses & Routing
+- [x] Day 4 - TCP & The Three-Way Handshake
 - [x] Day 5 - Sockets
 - [x] Day 6 - Processes, Threads & Concurrency
 
@@ -25,7 +25,7 @@
 
 ## Phase 4 - Production Features
 
-- [x] Day 15 - Worker Pool & Concurrent Request Handling (C server is multithreaded; Python worker is still a single process — next: run multiple worker processes and have the C server pick between them per request)
+- [x] Day 15 - Worker Pool & Concurrent Request Handling (3 Python workers running concurrently; C server round-robins between them with a mutex-protected index)
 - [x] Day 16 - Logging, Configuration & Error Handling
-- [ ] Day 17 - Testing, Benchmarking & Performance Optimization (unit + integration tests done; benchmarking not started)
-- [ ] Day 18 - Docker, Documentation & Final Polish
+- [x] Day 17 - Testing, Benchmarking & Performance Optimization (unit + integration tests pass; benchmarked 1-worker vs 3-worker pool — found and fixed a partial-read bug under concurrent load along the way, see benchmark/load_test.py)
+- [x] Day 18 - Docker, Documentation & Final Polish (Dockerfiles for the C server and worker, docker-compose to run the full stack with a shared volume for Unix sockets, README and roadmap brought up to date)

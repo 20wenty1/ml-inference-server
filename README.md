@@ -1,59 +1,82 @@
 # ML Inference Server
 
-A spam-detection inference server built from scratch in C, connected to a persistent PyTorch worker over a Unix domain socket. Built as a personal learning project to go past frameworks and understand what's actually happening at the socket/HTTP level, with AI assistance used throughout as a tutor and pair-programmer.
+A spam-detection inference server built from scratch in C, with a pool of persistent PyTorch workers connected over Unix domain sockets. Built as a personal learning project to go past frameworks and understand what's actually happening at the socket/HTTP level, with AI assistance used throughout as a tutor and pair-programmer.
 
 ## Goal
 
 Build an HTTP server from scratch that:
 - Accepts concurrent requests
-- Communicates with a persistent Python worker
+- Communicates with a pool of persistent Python workers
 - Runs PyTorch inference
 - Returns JSON responses
 - Follows the architecture of a production ML inference server
 
 ## What's Working
 
-- Raw TCP server in C (sockets, bind/listen/accept) with its own minimal HTTP parser
+- Raw TCP server in C (sockets, bind/listen/accept) with its own minimal HTTP parser, including a proper read loop that handles partial/chunked TCP reads correctly under load
 - Multithreaded request handling — each connection is handled on its own thread, so multiple clients can be served concurrently
-- A persistent Python worker (loads the PyTorch model once, stays running) connected to the C server over a Unix domain socket
-- Timeout and error handling on the C↔worker connection (malformed requests, empty bodies, worker unavailable/timeout all return proper HTTP status codes)
+- A pool of 3 persistent Python workers (each loads the PyTorch model once, stays running), connected to the C server over Unix domain sockets with mutex-protected round-robin load balancing
+- Timeout and error handling on the C↔worker connection and on client connections (malformed requests, empty bodies, worker unavailable/timeout all return proper HTTP status codes)
 - Centralized config (`c-server/config.h`) instead of hardcoded values
 - Unit tests for the inference layer (pytest) and integration tests for the HTTP endpoints (shell script against a running server)
-- An earlier FastAPI/Python-only prototype (`server/`) still in the repo as a baseline for future benchmarking
+- A load testing script (`benchmark/load_test.py`) with real before/after numbers for the worker pool (see Benchmark Results below)
+- Fully containerized with Docker Compose — all 3 workers and the C server run together, sharing a Docker volume for their Unix sockets
+- An earlier FastAPI/Python-only prototype (`server/`) still in the repo as a reference for how the project started
+
+## Benchmark Results
+
+Measured with `benchmark/load_test.py`, 60 requests at concurrency 10, against the real running server:
+
+| | 1 worker | 3 workers |
+|---|---|---|
+| Success rate | 58/60 | 60/60 |
+| Requests/sec | 320.71 | 410.85 |
+| Avg latency | 25.94ms | 23.41ms |
+
+Along the way, this also surfaced a real bug: the C server's original request parser assumed a single `read()` call would always return the complete HTTP request. Under real concurrent load, TCP can deliver a request in multiple chunks, so a single `read()` sometimes returned before the body had fully arrived — causing false "empty body" errors. Fixed with a proper read loop that keeps reading until `Content-Length` is satisfied.
 
 ## Not Yet Built
 
-- A worker pool (currently one Python worker process, so predictions themselves are not yet parallel — see `docs/roadmap.md`)
-- Benchmarking against the FastAPI baseline
-- Docker packaging
+- Benchmarking against the original FastAPI baseline (currently only 1-worker vs 3-worker C server is compared)
 - CI/CD
-- Health check endpoint for monitoring server/worker status 
+- Health check endpoint for monitoring server/worker status individually
 
 ## Tech Stack
 
 - C
 - Python
 - PyTorch
+- Docker
 - Linux (Ubuntu 24.04)
 - GCC
 - Git
 
 ## How to Run
 
-Requires three terminals, in this order:
+### Option 1: Docker (recommended)
 
-**1. Start the Python worker**
+`docker compose up --build`
+
+This builds and starts all 3 Python workers and the C server together, sharing a Docker volume for their Unix sockets. Once it's up, test it the same way as below.
+
+### Option 2: Running natively
+
+Requires four terminals, in this order:
+
+**1-3. Start each Python worker**
 ```bash
-python -m worker.server
+python -m worker.server /tmp/spam_worker_1.sock
+python -m worker.server /tmp/spam_worker_2.sock
+python -m worker.server /tmp/spam_worker_3.sock
 ```
 
-**2. Compile and start the C server**
+**4. Compile and start the C server**
 ```bash
 gcc c-server/main.c -o c-server/server -lpthread
 ./c-server/server
 ```
 
-**3. Test it**
+**Test it**
 ```bash
 curl http://localhost:8080/
 curl -X POST http://localhost:8080/predict -d "WINNER! Free prize, call now to claim!"
@@ -65,7 +88,14 @@ curl -X POST http://localhost:8080/predict -d "WINNER! Free prize, call now to c
 python -m pytest tests/ -v
 ./tests/test_server.sh
 ```
-(requires the worker and C server both running for the second one)
+(requires the worker(s) and C server both running for the second one)
+
+## Running the Benchmark
+
+```bash
+python benchmark/load_test.py
+```
+(requires the worker(s) and C server both running)
 
 ## Status
 

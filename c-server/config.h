@@ -8,9 +8,9 @@
 #define NUM_WORKERS 3
 
 static const char *WORKER_SOCKET_PATHS[NUM_WORKERS] = {
-    "/tmp/spam_worker_1.sock",
-    "/tmp/spam_worker_2.sock",
-    "/tmp/spam_worker_3.sock"
+    "/sockets/spam_worker_1.sock",
+    "/sockets/spam_worker_2.sock",
+    "/sockets/spam_worker_3.sock"
 };
 
 #endif

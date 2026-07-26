@@ -1,0 +1,41 @@
+services:
+  worker1:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    command: python -m worker.server /sockets/spam_worker_1.sock
+    volumes:
+      - sockets:/sockets
+
+  worker2:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    command: python -m worker.server /sockets/spam_worker_2.sock
+    volumes:
+      - sockets:/sockets
+
+  worker3:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    command: python -m worker.server /sockets/spam_worker_3.sock
+    volumes:
+      - sockets:/sockets
+
+  c-server:
+    build:
+      context: .
+      dockerfile: c-server/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - sockets:/sockets
+    depends_on:
+      - worker1
+      - worker2
+      - worker3
+
+volumes:
+  sockets:
+
