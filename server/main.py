@@ -10,8 +10,8 @@ async def lifespan(app: FastAPI):
     logger.info("ML Inference Server shutting down")
 
 app = FastAPI(
-    title="ML Inference Server",
-    description="A ML inference server built with FastAPI",
+    title="ML Inference Server (Original Prototype)",
+    description="Early FastAPI/Python prototype. Superseded by a C server with a threaded PyTorch worker pool — see the project README.",
     lifespan=lifespan,
 )
 
