@@ -121,7 +121,7 @@ void handle_client(int client_fd, const char *client_ip) {
     if (!check_rate_limit(client_ip)) {
         char *msg = "{\"error\": \"rate limit exceeded, slow down\"}";
         len = strlen(msg);
-        snprintf(res, sizeof(res), "HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+        snprintf(res, sizeof(res), "HTTP/1.1 429 Too Many Requests\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
         write(client_fd, res, strlen(res));
         close(client_fd);
         return;
@@ -176,18 +176,18 @@ void handle_client(int client_fd, const char *client_ip) {
     if (body_too_large) {
         char *msg = "{\"error\": \"request body too large\"}";
         len = strlen(msg);
-        snprintf(res, sizeof(res), "HTTP/1.1 413 Payload Too Large\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+        snprintf(res, sizeof(res), "HTTP/1.1 413 Payload Too Large\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
     }
     else if (strcmp(method, "GET") == 0 && strcmp(path, "/") == 0) {
         char *msg = "{\"message\": \"Spam detection API is running\"}";
         len = strlen(msg);
-        snprintf(res, sizeof(res), "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+        snprintf(res, sizeof(res), "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
     }
     else if (strcmp(method, "POST") == 0 && strcmp(path, "/predict") == 0) {
         if (body == NULL || strlen(body) == 0) {
             char *msg = "{\"error\": \"empty request body\"}";
             len = strlen(msg);
-            snprintf(res, sizeof(res), "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+            snprintf(res, sizeof(res), "HTTP/1.1 400 Bad Request\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
         }
         else {
             char prediction[256];
@@ -198,18 +198,18 @@ void handle_client(int client_fd, const char *client_ip) {
                 char msg[300];
                 snprintf(msg, sizeof(msg), "{\"prediction\": \"%s\"}", prediction);
                 len = strlen(msg);
-                snprintf(res, sizeof(res), "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+                snprintf(res, sizeof(res), "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
             } else {
                 char *msg = "{\"error\": \"worker unavailable or timed out\"}";
                 len = strlen(msg);
-                snprintf(res, sizeof(res), "HTTP/1.1 502 Bad Gateway\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+                snprintf(res, sizeof(res), "HTTP/1.1 502 Bad Gateway\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
             }
         }
     }
     else {
         char *msg = "{\"error\": \"not found\"}";
         len = strlen(msg);
-        snprintf(res, sizeof(res), "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+        snprintf(res, sizeof(res), "HTTP/1.1 404 Not Found\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
     }
 
     write(client_fd, res, strlen(res));
@@ -284,3 +284,4 @@ int main() {
     close(server_fd);
     return 0;
 }
+
