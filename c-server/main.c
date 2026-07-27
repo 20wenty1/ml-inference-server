@@ -57,10 +57,16 @@ const char *pick_worker_socket() {
 }
 
 void handle_client(int client_fd) {
+    struct timeval client_tv;
+    client_tv.tv_sec = CLIENT_TIMEOUT_SECONDS;
+    client_tv.tv_usec = 0;
+    setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &client_tv, sizeof(client_tv));
+
     char buffer[REQUEST_BUFFER_SIZE];
     int total_read = 0;
     int header_end = -1;
     int content_length = 0;
+    int body_too_large = 0;
 
     while (total_read < (int)sizeof(buffer) - 1) {
         int n = read(client_fd, buffer + total_read, sizeof(buffer) - 1 - total_read);
@@ -75,6 +81,12 @@ void handle_client(int client_fd) {
             char *cl = strstr(buffer, "Content-Length:");
             if (cl != NULL) {
                 content_length = atoi(cl + 15);
+            }
+
+            int max_body = (int)sizeof(buffer) - 1 - header_end;
+            if (content_length > max_body) {
+                body_too_large = 1;
+                break;
             }
 
             int body_received = total_read - header_end;
@@ -99,7 +111,12 @@ void handle_client(int client_fd) {
     char res[RESPONSE_BUFFER_SIZE];
     int len;
 
-    if (strcmp(method, "GET") == 0 && strcmp(path, "/") == 0) {
+    if (body_too_large) {
+        char *msg = "{\"error\": \"request body too large\"}";
+        len = strlen(msg);
+        snprintf(res, sizeof(res), "HTTP/1.1 413 Payload Too Large\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+    }
+    else if (strcmp(method, "GET") == 0 && strcmp(path, "/") == 0) {
         char *msg = "{\"message\": \"Spam detection API is running\"}";
         len = strlen(msg);
         snprintf(res, sizeof(res), "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);

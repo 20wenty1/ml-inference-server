@@ -6,6 +6,7 @@
 #define REQUEST_BUFFER_SIZE 4096
 #define RESPONSE_BUFFER_SIZE 512
 #define NUM_WORKERS 3
+#define CLIENT_TIMEOUT_SECONDS 5
 
 static const char *WORKER_SOCKET_PATHS[NUM_WORKERS] = {
     "/sockets/spam_worker_1.sock",
