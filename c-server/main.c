@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -56,11 +57,75 @@ const char *pick_worker_socket() {
     return WORKER_SOCKET_PATHS[index];
 }
 
-void handle_client(int client_fd) {
+typedef struct {
+    char ip[INET_ADDRSTRLEN];
+    time_t window_start;
+    int count;
+    int used;
+} rate_entry_t;
+
+rate_entry_t rate_table[MAX_TRACKED_IPS];
+pthread_mutex_t rate_lock = PTHREAD_MUTEX_INITIALIZER;
+
+int check_rate_limit(const char *ip) {
+    pthread_mutex_lock(&rate_lock);
+
+    time_t now = time(NULL);
+    int free_slot = -1;
+
+    for (int i = 0; i < MAX_TRACKED_IPS; i++) {
+        if (!rate_table[i].used) {
+            if (free_slot == -1) free_slot = i;
+            continue;
+        }
+
+        if (strcmp(rate_table[i].ip, ip) == 0) {
+            if (now - rate_table[i].window_start >= RATE_LIMIT_WINDOW_SECONDS) {
+                rate_table[i].window_start = now;
+                rate_table[i].count = 1;
+                pthread_mutex_unlock(&rate_lock);
+                return 1;
+            }
+
+            if (rate_table[i].count >= RATE_LIMIT_MAX_REQUESTS) {
+                pthread_mutex_unlock(&rate_lock);
+                return 0;
+            }
+
+            rate_table[i].count++;
+            pthread_mutex_unlock(&rate_lock);
+            return 1;
+        }
+    }
+
+    if (free_slot != -1) {
+        strncpy(rate_table[free_slot].ip, ip, INET_ADDRSTRLEN - 1);
+        rate_table[free_slot].window_start = now;
+        rate_table[free_slot].count = 1;
+        rate_table[free_slot].used = 1;
+    }
+
+    pthread_mutex_unlock(&rate_lock);
+    return 1;
+}
+
+void handle_client(int client_fd, const char *client_ip) {
     struct timeval client_tv;
     client_tv.tv_sec = CLIENT_TIMEOUT_SECONDS;
     client_tv.tv_usec = 0;
     setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &client_tv, sizeof(client_tv));
+
+    char res[RESPONSE_BUFFER_SIZE];
+    int len;
+
+    if (!check_rate_limit(client_ip)) {
+        char *msg = "{\"error\": \"rate limit exceeded, slow down\"}";
+        len = strlen(msg);
+        snprintf(res, sizeof(res), "HTTP/1.1 429 Too Many Requests\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", len, msg);
+        write(client_fd, res, strlen(res));
+        close(client_fd);
+        return;
+    }
 
     char buffer[REQUEST_BUFFER_SIZE];
     int total_read = 0;
@@ -108,9 +173,6 @@ void handle_client(int client_fd) {
     printf("method: %s\n", method);
     printf("path: %s\n", path);
 
-    char res[RESPONSE_BUFFER_SIZE];
-    int len;
-
     if (body_too_large) {
         char *msg = "{\"error\": \"request body too large\"}";
         len = strlen(msg);
@@ -154,10 +216,18 @@ void handle_client(int client_fd) {
     close(client_fd);
 }
 
+typedef struct {
+    int fd;
+    char ip[INET_ADDRSTRLEN];
+} client_task_t;
+
 void *handle_client_thread(void *arg) {
-    int client_fd = *(int *)arg;
-    free(arg);
-    handle_client(client_fd);
+    client_task_t *task = (client_task_t *)arg;
+    int client_fd = task->fd;
+    char ip[INET_ADDRSTRLEN];
+    strncpy(ip, task->ip, INET_ADDRSTRLEN);
+    free(task);
+    handle_client(client_fd, ip);
     return NULL;
 }
 
@@ -197,13 +267,14 @@ int main() {
             continue;
         }
 
-        int *fd_ptr = malloc(sizeof(int));
-        *fd_ptr = client_fd;
+        client_task_t *task = malloc(sizeof(client_task_t));
+        task->fd = client_fd;
+        inet_ntop(AF_INET, &client_addr.sin_addr, task->ip, INET_ADDRSTRLEN);
 
         pthread_t tid;
-        if (pthread_create(&tid, NULL, handle_client_thread, fd_ptr) != 0) {
+        if (pthread_create(&tid, NULL, handle_client_thread, task) != 0) {
             perror("thread create failed");
-            free(fd_ptr);
+            free(task);
             close(client_fd);
             continue;
         }

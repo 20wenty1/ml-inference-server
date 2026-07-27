@@ -7,6 +7,9 @@
 #define RESPONSE_BUFFER_SIZE 512
 #define NUM_WORKERS 3
 #define CLIENT_TIMEOUT_SECONDS 5
+#define RATE_LIMIT_WINDOW_SECONDS 10
+#define RATE_LIMIT_MAX_REQUESTS 20
+#define MAX_TRACKED_IPS 64
 
 static const char *WORKER_SOCKET_PATHS[NUM_WORKERS] = {
     "/sockets/spam_worker_1.sock",
@@ -15,4 +18,6 @@ static const char *WORKER_SOCKET_PATHS[NUM_WORKERS] = {
 };
 
 #endif
+
+
 
