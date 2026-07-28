@@ -11,6 +11,15 @@ Build an HTTP server from scratch that:
 - Returns JSON responses
 - Follows the architecture of a production ML inference server
 
+## Live Demo
+
+Deployed and running on a DigitalOcean droplet:
+
+```bash
+curl http://139.59.91.233:8080/
+curl -X POST http://139.59.91.233:8080/predict -d "WINNER! Free prize, call now to claim!"
+```
+
 ## What's Working
 
 - Raw TCP server in C (sockets, bind/listen/accept) with its own minimal HTTP parser, including a proper read loop that handles partial/chunked TCP reads correctly under load
@@ -20,8 +29,17 @@ Build an HTTP server from scratch that:
 - Centralized config (`c-server/config.h`) instead of hardcoded values
 - Unit tests for the inference layer (pytest) and integration tests for the HTTP endpoints (shell script against a running server)
 - A load testing script (`benchmark/load_test.py`) with real before/after numbers for the worker pool (see Benchmark Results below)
-- Fully containerized with Docker Compose — all 3 workers and the C server run together, sharing a Docker volume for their Unix sockets
+- Fully containerized with Docker Compose — all 3 workers and the C server run together, sharing a Docker volume for their Unix sockets, with a restart policy so the stack survives crashes or a server reboot
+- Deployed on a public DigitalOcean droplet, reachable from anywhere, not just localhost
 - An earlier FastAPI/Python-only prototype (`server/`) still in the repo as a reference for how the project started
+
+## Security
+
+- Client connection timeout (5s) — protects against Slowloris-style stalled connections tying up a thread indefinitely
+- Oversized request rejection (413) — `Content-Length` is validated against buffer capacity before it's trusted, instead of silently truncating
+- IP-based rate limiting (20 requests / 10s) — mutex-protected table tracks requests per IP in a rolling window
+- Worker connection timeout (3s) — a hung PyTorch worker can't hang the C server along with it
+- CORS enabled — allows browser-based clients (like the project's demo site) to call the API cross-origin
 
 ## Benchmark Results
 
@@ -40,6 +58,7 @@ Along the way, this also surfaced a real bug: the C server's original request pa
 - Benchmarking against the original FastAPI baseline (currently only 1-worker vs 3-worker C server is compared)
 - CI/CD
 - Health check endpoint for monitoring server/worker status individually
+- A domain name / HTTPS in front of the droplet (currently plain HTTP on a raw IP)
 
 ## Tech Stack
 
@@ -99,4 +118,4 @@ python benchmark/load_test.py
 
 ## Status
 
-🚧 Actively in progress — see `docs/roadmap.md` for what's done and what's next.
+✅ Core project complete — all 18 planned days done, plus security hardening and a live public deployment. See `docs/roadmap.md` for what's left beyond the original scope (CI/CD, HTTPS/domain).
